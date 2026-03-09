@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview en Rotatie Aanpassen</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin-top: 40px; }
+        #preview-container { border: 1px solid #ccc; min-height: 300px; min-width: 300px; display: flex; justify-content: center; align-items: center; }
+        #preview-img { max-width: 80vw; max-height: 60vh; }
+        .controls { margin-top: 20px; }
+        input { width: 80px; }
+        button { padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <h2>Preview</h2>
+    <div id="preview-container">
+        <p id="loading-text">Voorbeeld wordt geladen...</p>
+        <img id="preview-img" style="display:none;" />
+    </div>
+
+    <div class="controls">
+        <label for="rotation">Rotatiehoek:</label>
+        <input type="number" id="rotation" step="0.1">
+        <button id="update-preview">Update Preview</button>
+        <button id="download-btn">Download SVG</button>
+    </div>
+
+    <script>
+        const filename = "{{ filename }}";
+        const previewImg = document.getElementById('preview-img');
+        const rotationInput = document.getElementById('rotation');
+        const loadingText = document.getElementById('loading-text');
+
+        function updatePreview() {
+            // In een echte applicatie zou je hier de preview opnieuw genereren met de nieuwe hoek.
+            // Voor nu passen we de rotatie toe met CSS voor een snelle visuele feedback.
+            previewImg.style.transform = `rotate(${parseFloat(rotationInput.value) - parseFloat(rotationInput.defaultValue)}deg)`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch(`/preview-img/${filename}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    rotationInput.value = data.angle.toFixed(2);
+                    rotationInput.defaultValue = data.angle.toFixed(2); // Bewaar de originele hoek
+                    previewImg.src = data.preview_src;
+                    previewImg.style.display = 'block';
+                    loadingText.style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Fout bij het laden van de preview:', error);
+                    loadingText.textContent = 'Kon de preview niet laden. Controleer de developer console (F12) voor foutmeldingen.';
+                });
+        });
+
+        document.getElementById('update-preview').addEventListener('click', updatePreview);
+
+        document.getElementById('download-btn').addEventListener('click', async () => {
+            const response = await fetch('/finalize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename, angle: parseFloat(rotationInput.value) })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'silhouette_final.svg';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } else {
+                alert('Downloaden mislukt.');
+            }
+        });
+    </script>
+</body>
+</html>

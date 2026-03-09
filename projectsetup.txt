@@ -1,0 +1,6 @@
+project/
+├── app.py
+├── templates/
+│   └── index.html
+├── requirements.txt
+└── Dockerfile
