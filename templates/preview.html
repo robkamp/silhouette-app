@@ -22,7 +22,12 @@
 
     <div class="controls">
         <label for="rotation">Rotatiehoek:</label>
-        <input type="number" id="rotation" step="0.1">
+        <input type="number" id="rotation" step="0.1" style="margin-bottom: 10px;">
+        <br>
+        <label for="threshold">Drempelwaarde:</label>
+        <input type="range" id="threshold" min="0" max="255" value="200" step="1">
+        <span id="threshold-value">200</span>
+        <br><br>
         <button id="update-preview">Update Preview</button>
         <button id="download-btn">Download SVG</button>
     </div>
@@ -32,13 +37,15 @@
         const previewImg = document.getElementById('preview-img');
         const rotationInput = document.getElementById('rotation');
         const loadingText = document.getElementById('loading-text');
+        const thresholdInput = document.getElementById('threshold');
+        const thresholdValue = document.getElementById('threshold-value');
 
-        function updatePreview() {
-            // In een echte applicatie zou je hier de preview opnieuw genereren met de nieuwe hoek.
-            // Voor nu passen we de rotatie toe met CSS voor een snelle visuele feedback.
-            previewImg.style.transform = `rotate(${parseFloat(rotationInput.value) - parseFloat(rotationInput.defaultValue)}deg)`;
-        }
+        // Toon de huidige waarde van de slider
+        thresholdInput.addEventListener('input', () => {
+            thresholdValue.textContent = thresholdInput.value;
+        });
 
+        // Laad de initiële data
         document.addEventListener('DOMContentLoaded', () => {
             fetch(`/preview-img/${filename}`)
                 .then(response => {
@@ -50,6 +57,7 @@
                 .then(data => {
                     rotationInput.value = data.angle.toFixed(2);
                     rotationInput.defaultValue = data.angle.toFixed(2); // Bewaar de originele hoek
+                    thresholdInput.value = 200; // Standaardwaarde
                     previewImg.src = data.preview_src;
                     previewImg.style.display = 'block';
                     loadingText.style.display = 'none';
@@ -60,13 +68,31 @@
                 });
         });
 
-        document.getElementById('update-preview').addEventListener('click', updatePreview);
+        // Update de preview wanneer op de knop wordt geklikt
+        document.getElementById('update-preview').addEventListener('click', async () => {
+            loadingText.style.display = 'block';
+            previewImg.style.display = 'none';
+
+            const response = await fetch('/update-preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: filename,
+                    angle: parseFloat(rotationInput.value),
+                    threshold: parseInt(thresholdInput.value)
+                })
+            });
+            const data = await response.json();
+            previewImg.src = data.preview_src;
+            previewImg.style.display = 'block';
+            loadingText.style.display = 'none';
+        });
 
         document.getElementById('download-btn').addEventListener('click', async () => {
             const response = await fetch('/finalize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: filename, angle: parseFloat(rotationInput.value) })
+                body: JSON.stringify({ filename: filename, angle: parseFloat(rotationInput.value), threshold: parseInt(thresholdInput.value) })
             });
 
             if (response.ok) {

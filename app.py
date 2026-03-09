@@ -11,12 +11,12 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-def get_contours_and_angle(image_bytes):
+def get_contours_and_angle(image_bytes, threshold=200):
     """Leest een afbeelding, vindt contouren en berekent de automatische rotatiehoek."""
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+    _, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -44,7 +44,7 @@ def get_contours_and_angle(image_bytes):
 
     return contours, angle, img.shape[1], img.shape[0]
 
-def get_contours_from_rotated_image(image_bytes, angle):
+def get_contours_from_rotated_image(image_bytes, angle, threshold=200):
     """Roteert een afbeelding en retourneert de contouren van de objecten."""
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -55,14 +55,14 @@ def get_contours_from_rotated_image(image_bytes, angle):
     rotated_img = cv2.warpAffine(img, rot_mat, (width, height), borderValue=(255, 255, 255))
 
     gray = cv2.cvtColor(rotated_img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+    _, thresh = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     return contours, width, height
 
-def generate_preview(image_bytes, angle):
+def generate_preview(image_bytes, angle, threshold=200):
     """Genereert een PNG-preview van de geroteerde contouren."""
-    contours, width, height = get_contours_from_rotated_image(image_bytes, angle)
+    contours, width, height = get_contours_from_rotated_image(image_bytes, angle, threshold)
     
     preview_img = np.full((height, width, 3), 255, dtype=np.uint8)
     cv2.drawContours(preview_img, contours, -1, (0, 0, 0), thickness=cv2.FILLED)
@@ -70,9 +70,9 @@ def generate_preview(image_bytes, angle):
     _, buffer = cv2.imencode('.png', preview_img)
     return buffer.tobytes()
 
-def generate_svg(image_bytes, angle):
+def generate_svg(image_bytes, angle, threshold=200):
     """Genereert de uiteindelijke SVG op basis van de contouren van de geroteerde afbeelding."""
-    contours, width, height = get_contours_from_rotated_image(image_bytes, angle)
+    contours, width, height = get_contours_from_rotated_image(image_bytes, angle, threshold)
 
     svg_header = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
     svg_paths = []
@@ -137,18 +137,38 @@ def preview_img(filename):
     
     return jsonify({'angle': angle, 'preview_src': f'data:image/png;base64,{base64_encoded_data}'})
 
+@app.route('/update-preview', methods=['POST'])
+def update_preview_route():
+    """Genereert een nieuwe preview op basis van de door de gebruiker opgegeven waarden."""
+    data = request.get_json()
+    filename = data['filename']
+    angle = float(data.get('angle', 0))
+    threshold = int(data.get('threshold', 200))
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    with open(filepath, 'rb') as f:
+        image_bytes = f.read()
+
+    preview_bytes = generate_preview(image_bytes, angle, threshold)
+    
+    import base64
+    base64_encoded_data = base64.b64encode(preview_bytes).decode('utf-8')
+    
+    return jsonify({'preview_src': f'data:image/png;base64,{base64_encoded_data}'})
+
 @app.route('/finalize', methods=['POST'])
 def finalize():
     """Genereert de definitieve SVG met de (aangepaste) rotatiehoek."""
     data = request.get_json()
     filename = data['filename']
     angle = float(data['angle'])
+    threshold = int(data['threshold'])
     
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     with open(filepath, 'rb') as f:
         image_bytes = f.read()
 
-    svg_data = generate_svg(image_bytes, angle)
+    svg_data = generate_svg(image_bytes, angle, threshold)
     os.remove(filepath) # Ruim het tijdelijke bestand op
 
     return send_file(
