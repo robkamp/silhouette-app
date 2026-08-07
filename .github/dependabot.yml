@@ -1,0 +1,21 @@
+# Dependabot version updates.
+#
+# Security updates (PRs for disclosed vulnerabilities) are a separate
+# repository setting and are already enabled - this file adds routine
+# version bumps on top of that.
+#
+# Never auto-merge one of these without the test suite passing: a
+# dependency bump is exactly the kind of change that breaks something
+# quietly.
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
