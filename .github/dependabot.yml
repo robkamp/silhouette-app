@@ -14,8 +14,22 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      patch-en-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      patch-en-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
